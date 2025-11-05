@@ -317,7 +317,7 @@ export class TaskParser {
 	//   Return true or false if the text has a Todoist tag
 	hasTodoistTag(text: string) {
 		const regex_test = new RegExp(
-			`^[\\s]*[-] \\[[x ]\\] [\\s\\S]*${this.keywords_function("TODOIST_TAG")}[\\s\\S]*$`,
+			`^[>]*[\\s]*[-] \\[[x ]\\] [\\s\\S]*${this.keywords_function("TODOIST_TAG")}[\\s\\S]*$`,
 			"i",
 		);
 
@@ -508,6 +508,7 @@ export class TaskParser {
 			remove_date: /((🗓️|📅|📆|🗓|@)\s?\d{2,4}-\d{1,2}-\d{1,2})/,
 			remove_time: /((⏰|⏲|\$)\s?\d{2}:\d{2})/,
 			remove_inline_metadata: /%%\[\w+::\s*\w+\]%%/,
+			remove_callout: /^[>]*/,
 			remove_checkbox: /^(-|\*)\s+\[(x|X| )\]\s/,
 			remove_checkbox_with_indentation: /^([ \t]*)?(-|\*)\s+\[(x|X| )\]\s/,
 			remove_todoist_tid_link:
@@ -530,6 +531,7 @@ export class TaskParser {
 			.replace(regex_remove_rules.remove_tags, "")
 			.replace(regex_remove_rules.remove_date, "")
 			.replace(regex_remove_rules.remove_time, "")
+			.replace(regex_remove_rules.remove_callout, "")
 			.replace(regex_remove_rules.remove_checkbox, "")
 			.replace(regex_remove_rules.remove_checkbox_with_indentation, "")
 			.replace(regex_remove_rules.remove_space, "")
