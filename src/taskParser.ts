@@ -347,7 +347,7 @@ export class TaskParser {
 		const regex_test = new RegExp(
 			`(${this.keywords_function("DUE_DATE")})`,
 		);
-		if(regex_test){
+		if(regex_test.test(text)){
 			return true;
 		}
 		return false;
@@ -358,11 +358,13 @@ export class TaskParser {
 		const regex_test = new RegExp(
 			`(${this.keywords_function("DUE_DATE")})\\s?(\\d{2}(?:\\d{2})?)-(0?[1-9]|1[0-2])-(0?[1-9]|[12]\\d|3[01])`,
 		);
-		if(this.hasCalendarEmoji(text) && !regex_test.test(text)){
+
+		const hasDueDate = regex_test.test(text);
+		if(this.hasCalendarEmoji(text) && !hasDueDate){
 			console.warn("Task has due date trigger, but date format seems to be wrong. Please provide a valid YYYY-MM-DD format.");
 		}
 
-		return regex_test.test(text);
+		return hasDueDate;
 	}
 	hasDueTime(text: string) {
 		const regex_test = new RegExp(
