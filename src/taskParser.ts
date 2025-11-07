@@ -143,24 +143,11 @@ export class TaskParser {
 				"";
 		}
 
-		if (project_name) {
-			const hasProjectOnCache =
-				this.plugin.cacheOperation?.checkIfProjectExistOnCache(project_name);
-			if (hasProjectOnCache) {
-				projectId = hasProjectOnCache.toString();
-			}
-			if (!hasProjectOnCache) {
-				const newProject =
-					await this.plugin.todoistNewAPI?.createNewProject(project_name);
-				projectId = newProject?.id;
-				if (newProject) {
-					this.plugin.cacheOperation?.addProjectToCache(
-						project_name,
-						newProject?.id,
-					);
-				}
-			}
-		}
+		// Check if project exists in cache.
+		// If project exist, load it from the cache.
+		// If it does not exist, add it to the cache
+		projectId = await this.checkCacheForProjectAndAdd(project_name);
+		
 		if (!projectId) {
 			console.error("projectId was not found");
 		}
@@ -168,38 +155,12 @@ export class TaskParser {
 			console.error("project_name was not found");
 		}
 
-		// If the task has section, it tries to retrieve from cache, if don't find, create a new one and store it on cache.
-		if (section) {
-			let hasSectionOnCache = false;
-			if (projectId) {
-				hasSectionOnCache = Boolean(
-					this.plugin.cacheOperation?.checkIfSectionExistOnCache(
-						section,
-						projectId,
-					),
-				);
-				if (hasSectionOnCache) {
-					sectionId =
-						this.plugin.cacheOperation?.getSectionIdByNameFromCache(section);
-				}
-			}
-			if (!hasSectionOnCache) {
-				if (projectId) {
-					const newSection = await this.plugin.todoistNewAPI?.createNewSection(
-						section,
-						projectId,
-					);
-					sectionId = newSection?.id;
-					if (newSection) {
-						this.plugin.cacheOperation?.addSectionToCache(
-							section,
-							newSection?.id,
-							projectId,
-						);
-					}
-				}
-			}
+		// If the task has a section, try to retrieve the section from the cache.
+		// If the section is not found, create a new section and store it to the cache.
+		if(section) {
+			await this.checkCacheForSectionAndAdd(section, projectId);
 		}
+		
 
 		if (hasParent) {
 			projectId = parentTaskObject?.project_id ?? "";
@@ -284,6 +245,65 @@ export class TaskParser {
 		const fullMonth = month.length === 1 ? `0${month}` : month;
 		const fullDay = day.length === 1 ? `0${day}` : day;
 		return `${fullYear}-${fullMonth}-${fullDay}`;
+	}
+
+	async checkCacheForSectionAndAdd(section:string, projectId:string) {
+		let hasSectionOnCache = false;
+		let sectionId: string | undefined | null;
+
+		if (projectId) {
+			hasSectionOnCache = Boolean(
+				this.plugin.cacheOperation?.checkIfSectionExistOnCache(
+					section,
+					projectId,
+				),
+			);
+			if (hasSectionOnCache) {
+				sectionId =
+					this.plugin.cacheOperation?.getSectionIdByNameFromCache(section);
+			}
+		}
+		if (!hasSectionOnCache) {
+			if (projectId) {
+				const newSection = await this.plugin.todoistNewAPI?.createNewSection(
+					section,
+					projectId,
+				);
+				sectionId = newSection?.id;
+				if (newSection) {
+					this.plugin.cacheOperation?.addSectionToCache(
+						section,
+						newSection?.id,
+						projectId,
+					);
+				}
+			}
+		}	
+		return sectionId;
+	}
+	
+	async checkCacheForProjectAndAdd(project_name:string) {
+		let projectId = "";
+
+		if (project_name) {
+			const hasProjectOnCache =
+				this.plugin.cacheOperation?.checkIfProjectExistOnCache(project_name);
+			if (hasProjectOnCache) {
+				projectId = hasProjectOnCache.toString();
+			}
+			if (!hasProjectOnCache) {
+				const newProject =
+					await this.plugin.todoistNewAPI?.createNewProject(project_name);
+				projectId = newProject?.id;
+				if (newProject) {
+					this.plugin.cacheOperation?.addProjectToCache(
+						project_name,
+						newProject?.id,
+					);
+				}
+			}
+		}
+		return projectId;
 	}
 
 	keywords_function(text: string) {

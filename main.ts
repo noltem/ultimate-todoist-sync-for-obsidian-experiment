@@ -12,6 +12,7 @@ import { CacheOperation } from "./src/cacheOperation";
 import { FileOperation } from "./src/fileOperation";
 import { TodoistSync } from "./src/syncModule";
 import { SetDefaultProjectInTheFilepathModal } from "src/modal";
+import { MenuItemCreator } from "src/menuItem";
 
 export default class AnotherSimpleTodoistSync extends Plugin {
 	settings: AnotherSimpleTodoistSyncSettings;
@@ -23,6 +24,7 @@ export default class AnotherSimpleTodoistSync extends Plugin {
 	lastLines: Map<string, number>;
 	statusBar: HTMLElement;
 	syncLock: boolean;
+	contextMenuModifier: MenuItemCreator | undefined;
 
 	
 
@@ -440,12 +442,29 @@ export default class AnotherSimpleTodoistSync extends Plugin {
 
 		this.initializeModuleClass();
 
+		this.addOptionsToContextMenu();
+
 		//get user plan resources
 		//const rsp = await this.todoistSyncAPI.getUserResource()
 		this.settings.apiInitialized = true;
 		this.syncLock = false;
 		new Notice("Another Simple Todoist Sync loaded successfully.");
 		return true;
+	}
+
+	async addOptionsToContextMenu() {
+		this.registerEvent(
+			this.app.workspace.on('editor-menu', (menu, _, view) => {
+				const file = view.file;
+				if (!file) {
+					return;
+				}
+				this.contextMenuModifier = new MenuItemCreator(menu, this);
+				
+				
+				this.contextMenuModifier.addMenuItems();
+			})
+		);
 	}
 
 	async initializeModuleClass() {
