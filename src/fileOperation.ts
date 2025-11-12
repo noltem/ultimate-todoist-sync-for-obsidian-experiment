@@ -102,7 +102,7 @@ export class FileOperation {
 		let modified = false;
 
 		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
+			let line = lines[i];
 			if (!this.plugin.taskParser?.isMarkdownTask(line)) {
 				continue;
 			}
@@ -110,9 +110,23 @@ export class FileOperation {
 			if (this.plugin.taskParser?.getTaskContentFromLineText(line) === "") {
 				continue;
 			}
+
+			if(this.plugin.settings.autofixNonExistingTodoistTask)
+			{
+				const missingTaskMark = RegExp(`\\<mark.*\\+\\+\\+${this.plugin.settings.nonExistingTodoistFlag}\\+\\+\\+\\<\\/mark\\>`)
+				if(line.match(missingTaskMark))
+				{
+					line = line.replace(missingTaskMark, "");
+					line = line.replace(RegExp(/[\s]+/, "g"), " ");
+					line = line.replace(RegExp(/\s^/), "");
+					modified=true;
+				}
+			}
+			
 			if (
 				!this.plugin.taskParser?.hasTodoistId(line) &&
-				!this.plugin.taskParser?.hasTodoistTag(line)
+				!this.plugin.taskParser?.hasTodoistTag(line) &&
+				!this.plugin.taskParser?.hasNonExistingFlag(line)
 			) {
 				const newLine = this.plugin.taskParser?.addTodoistTag(line);
 				lines[i] = newLine;
