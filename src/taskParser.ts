@@ -49,7 +49,7 @@ export class TaskParser {
 				}
 			}
 		}
-
+		
 		let dueDateVsDatetime = "";
 		if(this.hasCalendarEmoji(textWithoutIndentation) && !this.hasDueDate(textWithoutIndentation)){
 			console.warn("Task has calendar emoji trigger, but due date seems to be missing. Please provide a valid due date.");
@@ -341,6 +341,13 @@ export class TaskParser {
 			/tid:: \[[a-zA-Z0-9]+\]\((?:https:\/\/app.todoist.com\/app\/task\/[a-zA-Z0-9]+|todoist:\/\/task\?id=[a-zA-Z0-9]+)\)/,
 		).test(text);
 		return regex_tag_test;
+	}
+
+	hasNonExistingFlag(text:string){
+		const regex_test = new RegExp(
+			`\\+\\+\\+${this.plugin.settings.nonExistingTodoistFlag}\\+\\+\\+`
+		);
+		return regex_test.test(text);
 	}
 
 	hasCalendarEmoji(text:string){
