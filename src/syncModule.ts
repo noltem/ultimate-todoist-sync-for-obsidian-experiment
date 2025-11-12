@@ -799,6 +799,9 @@ export class TodoistSync {
 							throw new Error("Task could not be updated, there was an error in the todoist API request.");
 						}
 
+						// Enable synchronization of missing tasks from todoist only as experimental feature.
+						if (this.plugin.settings.experimentalFeatures)
+						{
 						/* we have seen this previously, delete it from the cache. */
 						if(lineTask.content.match(`\\+\\+\\+Task not found in todoist\\+\\+\\+`))
 						{	
@@ -848,6 +851,7 @@ export class TodoistSync {
 							(updatedTask as { path?: string }).path = filepath;
 							this.plugin.cacheOperation?.updateTaskToCacheByID(updatedTask);
 							savedTask = updatedTask;
+							}
 						}
 					}
 				}
