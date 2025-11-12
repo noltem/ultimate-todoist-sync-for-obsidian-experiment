@@ -1,7 +1,8 @@
 import type AnotherSimpleTodoistSync from "../main";
 import type { App, Editor, TAbstractFile } from "obsidian";
 import { TFile, MarkdownView, Notice } from "obsidian";
-import type { TodoistEvent } from "./todoistAPI";
+import { TaskUpdateStatus, type TaskUpdateReturn, type TodoistEvent } from "./todoistAPI";
+import { FileOperation } from "./fileOperation"
 import type { Task } from "./cacheOperation";
 export class TodoistSync {
 	app: App;
@@ -234,20 +235,7 @@ export class TodoistSync {
 
 				// Handle frontMatter
 				try {
-					// Handle front matter
-					const frontMatter =
-						await this.plugin.cacheOperation?.getFileMetadataByFilePath(filepath);
-					const newFrontMatter = { ...frontMatter };
-					newFrontMatter.todoistCount = (newFrontMatter.todoistCount ?? 0) + 1;
-					newFrontMatter.todoistTasks = [
-						...(newFrontMatter.todoistTasks || []),
-						todoist_id,
-					];
-					await this.updateTodoistFrontMatter(
-						filepath,
-						newFrontMatter.todoistTasks,
-						newFrontMatter.todoistCount,
-					);
+					this.handleFrontMatter(todoist_id, filepath);
 				} catch (error) {
 					console.error(error);
 				}
@@ -256,6 +244,23 @@ export class TodoistSync {
 				return;
 			}
 		}
+	}
+
+	async handleFrontMatter(todoist_id: string, filepath: string){
+		// Handle front matter
+		const frontMatter =
+			await this.plugin.cacheOperation?.getFileMetadataByFilePath(filepath);
+		const newFrontMatter = { ...frontMatter };
+		newFrontMatter.todoistCount = (newFrontMatter.todoistCount ?? 0) + 1;
+		newFrontMatter.todoistTasks = [
+			...(newFrontMatter.todoistTasks || []),
+			todoist_id,
+		];
+		await this.updateTodoistFrontMatter(
+			filepath,
+			newFrontMatter.todoistTasks,
+			newFrontMatter.todoistCount,
+		);
 	}
 
 	async fullTextNewTaskCheck(file_path: string): Promise<void> {
@@ -779,17 +784,71 @@ export class TodoistSync {
 							updatedContent,
 						);
 					}
-					const updatedTask = await this.plugin.todoistNewAPI?.updateTask(
+
+					
+					const updatedTaskStatus = await this.plugin.todoistNewAPI?.updateTask(
 						lineTask.id,
 						{
 							...updatedContent,
 						},
 					);
+				
+					if(updatedTaskStatus)
+					{
+						if(updatedTaskStatus.status == TaskUpdateStatus.ERR_FATAL) {
+							throw new Error("Task could not be updated, there was an error in the todoist API request.");
+						}
 
-					if (updatedTask) {
-						(updatedTask as { path?: string }).path = filepath;
-						this.plugin.cacheOperation?.updateTaskToCacheByID(updatedTask);
-						savedTask = updatedTask;
+						/* we have seen this previously, delete it from the cache. */
+						if(lineTask.content.match(`\\+\\+\\+Task not found in todoist\\+\\+\\+`))
+						{	
+							// remove todoist link & hashtag from task
+							let newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(this.plugin.settings.customSyncTag), "");
+							if(newFileContent)
+							{
+								fileContent = newFileContent;
+							}
+
+							newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(/%%\[tid:: \[[a-zA-Z0-9]+\]\([^\)]*\)\]%%/), "");
+							
+							if(newFileContent) {
+								await this.plugin.fileOperation?.writeFileContentToFile(filepath, newFileContent);
+							}
+							this.plugin.cacheOperation?.deleteTaskFromCache(lineTask.id);
+
+							return
+						}
+
+						if(updatedTaskStatus.status  == TaskUpdateStatus.ERR_TASKNOTFOUND) {
+							/** 
+							 * We will emulate a toidist triggered change of the task.
+							 * Create a todoist event to synchronize a changed description 
+							 * with the hint that the task was not found in todoist.
+							 **/
+							lineTask.content = lineTask.content + "<mark style=\"background: #FF5582A6;\">+++Task not found in todoist+++</mark>";
+							lineTask.labels = lineTask.labels?.filter(label => label !== this.plugin.settings.customSyncTag);
+							updatedTaskStatus.task = lineTask;
+
+							// create todoist event. The fields except for the object_id and extra_data should be unused.
+							let updateEvent: TodoistEvent = {
+								id: "0",
+								event_date: new Date().toJSON(),
+								event_type: "updated",
+								object_type: "item",
+								object_id: lineTask.id,
+								extra_data: {
+									content: lineTask.content as string,
+								}
+							}
+							
+							await this.syncUpdatedTaskContentToObsidian(updateEvent);
+						}
+						if (updatedTaskStatus.task) {
+							let updatedTask = updatedTaskStatus.task;
+							(updatedTask as { path?: string }).path = filepath;
+							this.plugin.cacheOperation?.updateTaskToCacheByID(updatedTask);
+							savedTask = updatedTask;
+						}
 					}
 				}
 
@@ -1088,7 +1147,7 @@ export class TodoistSync {
 				extra_data: {
 					content: e.extra_data.content as string,
 				},
-			});
+			});		
 		}
 		const content = e.extra_data?.content;
 		if (content) {
@@ -1256,11 +1315,15 @@ export class TodoistSync {
 					taskId,
 					updatedContent,
 				);
-				if (!updatedTask) {
-					console.error(`Failed to update task ${taskId} description`);
-					return;
+
+				if(updatedTask){
+					if (!updatedTask.task) {
+						console.error(`Failed to update task ${taskId} description`);
+						return;
+					}
+					this.plugin.cacheOperation?.ToCacheByID(updatedTask.task);
 				}
-				this.plugin.cacheOperation?.updateTaskToCacheByID(updatedTask);
+								
 			}
 		} catch (error) {
 			console.error("An error occurred in updateTaskDescription:", error);
