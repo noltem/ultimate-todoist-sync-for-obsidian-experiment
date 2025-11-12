@@ -798,59 +798,77 @@ export class TodoistSync {
 						if(updatedTaskStatus.status == TaskUpdateStatus.ERR_FATAL) {
 							throw new Error("Task could not be updated, there was an error in the todoist API request.");
 						}
-
+						
 						// Enable synchronization of missing tasks from todoist only as experimental feature.
 						if (this.plugin.settings.experimentalFeatures)
 						{
-						/* we have seen this previously, delete it from the cache. */
-						if(lineTask.content.match(`\\+\\+\\+Task not found in todoist\\+\\+\\+`))
-						{	
-							// remove todoist link & hashtag from task
-							let newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(this.plugin.settings.customSyncTag), "");
-							if(newFileContent)
-							{
-								fileContent = newFileContent;
-							}
-
-							newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(/%%\[tid:: \[[a-zA-Z0-9]+\]\([^\)]*\)\]%%/), "");
-							
-							if(newFileContent) {
-								await this.plugin.fileOperation?.writeFileContentToFile(filepath, newFileContent);
-							}
-							this.plugin.cacheOperation?.deleteTaskFromCache(lineTask.id);
-
-							return
-						}
-
-						if(updatedTaskStatus.status  == TaskUpdateStatus.ERR_TASKNOTFOUND) {
-							/** 
-							 * We will emulate a toidist triggered change of the task.
-							 * Create a todoist event to synchronize a changed description 
-							 * with the hint that the task was not found in todoist.
-							 **/
-							lineTask.content = lineTask.content + "<mark style=\"background: #FF5582A6;\">+++Task not found in todoist+++</mark>";
-							lineTask.labels = lineTask.labels?.filter(label => label !== this.plugin.settings.customSyncTag);
-							updatedTaskStatus.task = lineTask;
-
-							// create todoist event. The fields except for the object_id and extra_data should be unused.
-							let updateEvent: TodoistEvent = {
-								id: "0",
-								event_date: new Date().toJSON(),
-								event_type: "updated",
-								object_type: "item",
-								object_id: lineTask.id,
-								extra_data: {
-									content: lineTask.content as string,
+							/* we have seen this previously, delete it from the cache. */
+							if(lineTask.content.match(String(`\\+\\+\\+${this.plugin.settings.nonExistingTodoistFlag}\\+\\+\\+`)))
+							{	
+								// remove todoist link & hashtag from task
+								let newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(this.plugin.settings.customSyncTag), "");
+								if(newFileContent)
+								{
+									fileContent = newFileContent;
 								}
-							}
-							
-							await this.syncUpdatedTaskContentToObsidian(updateEvent);
-						}
-						if (updatedTaskStatus.task) {
-							let updatedTask = updatedTaskStatus.task;
-							(updatedTask as { path?: string }).path = filepath;
-							this.plugin.cacheOperation?.updateTaskToCacheByID(updatedTask);
-							savedTask = updatedTask;
+
+								newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(/%%\[tid:: \[[a-zA-Z0-9]+\]\([^\)]*\)\]%%/), "");
+								
+								if(newFileContent) {
+									await this.plugin.fileOperation?.writeFileContentToFile(filepath, newFileContent);
+								}
+								this.plugin.cacheOperation?.deleteTaskFromCache(lineTask.id);
+
+							}else{
+								if(updatedTaskStatus.status  == TaskUpdateStatus.ERR_TASKNOTFOUND) {
+									/** 
+									 * We will emulate a toidist triggered change of the task (cf. comment below).
+									 * Create a todoist event to synchronize a changed description 
+									 * with the hint that the task was not found in todoist.
+									 **/
+									lineTask.content = lineTask.content + " <mark style=\"background: #FF5582A6;\">+++" + this.plugin.settings.nonExistingTodoistFlag + "+++</mark>";
+									lineTask.content = lineTask.content.replace(/[ ]+/, " ");
+									lineTask.content = lineTask.content.replace(/\s^/, "");
+
+									lineTask.labels = lineTask.labels?.filter(label => label !== this.plugin.settings.customSyncTag);
+									updatedTaskStatus.task = lineTask;
+									
+									/**
+									 * This is some sort of ugly hack (or is it?): The task does not exist in todoist anymore.
+									 * Nonetheless, I would like to use existing code to perform the update.
+									 * Hence, we fake a "fetched" update with the flagged task content.
+									 * 
+									 * This is also the reason why flagging & deleting from todoist is a 
+									 * two stage process: When the todoist API returns 404, the task still 
+									 * exists in the cache on the obsidian side with a todoist id.
+									 * As the obsidian cache relies on todoist ids to identify the containing
+									 * tasks, we
+									 * 
+									 * 1. modify the task content based on the outdated todoist id
+									 * 2. delete the task from the cache and remove the todoist sync tag as well
+									 *    as the todoist link.
+									 **/
+									// create todoist event. The fields except for the object_id and extra_data should be unused.
+									let updateEvent: TodoistEvent = {
+										id: "0",
+										event_date: new Date().toJSON(),
+										event_type: "updated",
+										object_type: "item",
+										object_id: lineTask.id,
+										extra_data: {
+											content: lineTask.content as string,
+										}
+									}
+									
+									await this.syncUpdatedTaskContentToObsidian(updateEvent);
+								}else{
+									if (updatedTaskStatus.task) {
+										let updatedTask = updatedTaskStatus.task;
+										(updatedTask as { path?: string }).path = filepath;
+										this.plugin.cacheOperation?.updateTaskToCacheByID(updatedTask);
+										savedTask = updatedTask;
+									}
+								}
 							}
 						}
 					}
