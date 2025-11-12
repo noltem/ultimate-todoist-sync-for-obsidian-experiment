@@ -1,6 +1,7 @@
 import {MarkdownView, Menu, MenuItem, Notice} from 'obsidian';
 import type AnotherSimpleTodoistSync from "../main";
 import { Task, CacheOperation } from './cacheOperation';
+import {} from './syncModule';
 
 
 export class MenuItemCreator {
@@ -116,6 +117,8 @@ export class MenuItemCreator {
                 const cursor = view.editor.getCursor();
                 view.editor.replaceRange(lineOutput, cursor);
             }
+            this.plugin.todoistSync?.handleFrontMatter(todoistTask.id, filepath as string);
+
         }
     }
 
