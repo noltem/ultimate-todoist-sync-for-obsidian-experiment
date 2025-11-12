@@ -561,4 +561,33 @@ export class FileOperation {
 		}
 		return false;
 	}
+
+	getLinesIncludingTaskId(filecontent:string, taskid:string): RegExpMatchArray | null {
+		const regex = new RegExp(`^[>]*\\s*- \\[[ x]\\].*${taskid}.*$`,"m");
+		let match = filecontent.match(regex);
+
+		return match;
+	}
+
+	findAndReplaceInTask(filecontent:string, taskid:string, find:RegExp, replace:string): string {
+		const newFilecontent = filecontent.replace(
+			// Match a line containing the task ID
+			new RegExp(`(^[>]*\\s*- \\[[ x]\\].*${taskid}.*$)`, "gm"),
+			(match) => {
+				// Replace needle in the found task line only
+				return match.replace(find, replace);
+			}
+		);
+		return newFilecontent;
+	}
+
+	async writeFileContentToFile(filepath:string, filecontent:string) {
+		if(filecontent)
+		{
+			const file = this.app.vault.getAbstractFileByPath(filepath);
+			if(file instanceof TFile) {
+				await this.app.vault.modify(file, filecontent);
+			}
+		}
+	}
 }
