@@ -2,6 +2,18 @@ import { TodoistApi } from "@doist/todoist-api-typescript";
 import type AnotherSimpleTodoistSync from "main";
 import type { App } from "obsidian";
 import { requestUrl } from "obsidian";
+import { Task } from "./cacheOperation";
+
+export const enum TaskUpdateStatus {
+	OK,
+	ERR_TASKNOTFOUND,
+	ERR_FATAL
+};
+
+export type TaskUpdateReturn = {
+	task?: Task;
+	status: TaskUpdateStatus;
+};
 
 type TodoistEvent = {
 	id: string;
@@ -296,7 +308,6 @@ export class TodoistNewAPI {
 		},
 	) {
 		const token = this.plugin.settings.todoistAPIToken;
-
 		if (!taskId) {
 			throw new Error("taskId is required");
 		}
@@ -387,23 +398,37 @@ export class TodoistNewAPI {
 			if (this.plugin.settings.debugMode) {
 				console.log("Todoist Task data to be updated: ", taskData);
 			}
+			
+			try {
+				const response = await requestUrl({
+					url: `https://todoist.com/api/v1/tasks/${taskId}`,
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${token}`,
+						"Content-Type": "application/json",
+						"Accept": "application/json"
+					},
+					body: JSON.stringify(taskData),
+				});
+				
+				let returnTask: TaskUpdateReturn = {
+					status: TaskUpdateStatus.OK,
+					task: response.json
+				};
 
-			const response = await requestUrl({
-				url: `https://todoist.com/api/v1/tasks/${taskId}`,
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${token}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(taskData),
-			});
-
-			if (response.status >= 400) {
-				throw new Error(`API returned error status: ${response.status}`);
-			}
-
-			const updatedTask = response.json;
-			return updatedTask;
+				return returnTask
+			}catch(error){
+				if(error.status = "404") {
+					console.warn("TaskID not found in todoist.\n Task will be removed from cache and flagged. \n Re add " + this.plugin.settings.customSyncTag + " to resync to todoist.");
+					let returnStatus: TaskUpdateReturn = {
+						status: TaskUpdateStatus.ERR_TASKNOTFOUND
+					};
+					return returnStatus;
+				}
+				if (error instanceof Error) {
+					throw new Error(`API request failed: ${error.message}`);
+				}
+			}			
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Error updating task: ${error.message}`);
