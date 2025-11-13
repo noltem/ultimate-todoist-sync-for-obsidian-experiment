@@ -1,6 +1,8 @@
 import type { App } from "obsidian";
 import { TFile, Notice } from "obsidian";
 import type AnotherSimpleTodoistSync from "../main";
+import type { Task } from "./cacheOperation";
+
 export class FileOperation {
 	app: App;
 	plugin: AnotherSimpleTodoistSync;
@@ -113,14 +115,7 @@ export class FileOperation {
 
 			if(this.plugin.settings.autofixNonExistingTodoistTask)
 			{
-				const missingTaskMark = RegExp(`\\<mark.*\\+\\+\\+${this.plugin.settings.nonExistingTodoistFlag}\\+\\+\\+\\<\\/mark\\>`)
-				if(line.match(missingTaskMark))
-				{
-					line = line.replace(missingTaskMark, "");
-					line = line.replace(RegExp(/[\s]+/, "g"), " ");
-					line = line.replace(RegExp(/\s^/), "");
-					modified=true;
-				}
+				({ line, modified } = this.removeMissingTaskFlagFromLine(line, modified));
 			}
 			
 			if (
@@ -145,6 +140,17 @@ export class FileOperation {
 				await this.plugin.cacheOperation?.newEmptyFileMetadata(filepath);
 			}
 		}
+	}
+
+	removeMissingTaskFlagFromLine(line: string, modified: boolean) {
+		const missingTaskMark = RegExp(`\\<mark.*\\+\\+\\+${this.plugin.settings.nonExistingTodoistFlag}\\+\\+\\+\\<\\/mark\\>`);
+		if (line.match(missingTaskMark)) {
+			line = line.replace(missingTaskMark, "");
+			line = line.replace(RegExp(/[\s]+/, "g"), " ");
+			line = line.replace(RegExp(/\s^/), "");
+			modified = true;
+		}
+		return { line, modified };
 	}
 
 	//add Todoist at the line
@@ -603,5 +609,13 @@ export class FileOperation {
 				await this.app.vault.modify(file, filecontent);
 			}
 		}
+	}
+
+	removeTodoistLinkFromTaskInFile(fileContent: string, lineTask: Task) {
+		return this.findAndReplaceInTask(fileContent, lineTask.id, RegExp(/%%\[tid:: \[[a-zA-Z0-9]+\]\([^\)]*\)\]%%/), "");
+	}
+
+	removeSyncTagFromTaskInFile(fileContent: string, lineTask: Task) {
+		return this.findAndReplaceInTask(fileContent, lineTask.id, RegExp(this.plugin.settings.customSyncTag), "");
 	}
 }
