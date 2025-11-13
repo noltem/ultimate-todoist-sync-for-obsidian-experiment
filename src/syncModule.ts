@@ -1130,6 +1130,33 @@ export class TodoistSync {
 		}
 	}
 
+	// Synchronize deleted item status to Obsidian
+	async syncDeletedTaskStatusToObsidian(unSynchronizedEvents: TodoistEvent[])
+	{
+		try{
+			const  processedEvents = [];
+			for(const e of unSynchronizedEvents) {
+				new Notice(`Task ${e.object_id} got a delete event from Todoist.`);
+				let task = this.plugin.settings.todoistTasksData.tasks.find((task) => task.id === e.object_id);
+				if (task) {
+					this.addTodoistTaskNotFoundFlag(task);
+					if(e.extra_data)
+					{
+						e.extra_data.content = task.content;
+					}
+
+					await this.syncUpdatedTaskContentToObsidian(e);
+				}
+				processedEvents.push(e);
+			}
+
+			this.plugin.cacheOperation?.appendEventsToCache(processedEvents);
+			this.plugin.saveSettings();
+		} catch (error) {
+			console.error("Error syncing deleted item", error);
+		}
+	}
+
 	// Synchronize updated item status to Obsidian
 	async syncUpdatedTaskToObsidian(unSynchronizedEvents: TodoistEvent[]) {
 		try {
@@ -1166,6 +1193,24 @@ export class TodoistSync {
 		} catch (error) {
 			console.error("Error syncing updated item", error);
 		}
+	}
+
+	async syncDeletedTaskToObsidian(e: TodoistEvent) {
+		if (e.object_id && e.extra_data?.content) {
+			this.plugin.fileOperation?.syncUpdatedTaskContentToTheFile({
+				object_id: e.object_id,
+				extra_data: {
+					content: e.extra_data.content as string,
+				},
+			});		
+		}
+		const content = e.extra_data?.content;
+		if (content) {
+			this.plugin.cacheOperation?.modifyTaskToCacheByID(e.object_id, content);
+		}
+		if (!e.parent_item_id === null) {
+			new Notice(`The content of Task ${e.parent_item_id} has been modified.`);
+		}		
 	}
 
 	async syncUpdatedTaskContentToObsidian(e: TodoistEvent) {
@@ -1277,6 +1322,13 @@ export class TodoistSync {
 					object_type: "item",
 				});
 
+			//Item deleted
+			const not_synchronized_item_deleted_events =
+				this.plugin.todoistNewAPI?.filterActivityEvents(result2, {
+					event_type: "deleted",
+					object_type: "item",
+				});
+
 			const not_synchronized_notes_added_events =
 				this.plugin.todoistNewAPI?.filterActivityEvents(result3, {
 					event_type: "added",
@@ -1286,6 +1338,10 @@ export class TodoistSync {
 				this.plugin.todoistNewAPI?.filterActivityEvents(result1, {
 					object_type: "project",
 				});
+
+			await this.syncDeletedTaskStatusToObsidian(
+				not_synchronized_item_deleted_events ?? [],
+			);
 
 			await this.syncCompletedTaskStatusToObsidian(
 				not_synchronized_item_completed_events ?? [],
