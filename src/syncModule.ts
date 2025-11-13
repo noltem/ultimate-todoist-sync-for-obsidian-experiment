@@ -4,6 +4,7 @@ import { TFile, MarkdownView, Notice } from "obsidian";
 import { TaskUpdateStatus, type TaskUpdateReturn, type TodoistEvent } from "./todoistAPI";
 import { FileOperation } from "./fileOperation"
 import type { Task } from "./cacheOperation";
+
 export class TodoistSync {
 	app: App;
 	plugin: AnotherSimpleTodoistSync;
@@ -803,16 +804,16 @@ export class TodoistSync {
 						if (this.plugin.settings.experimentalFeatures)
 						{
 							/* we have seen this previously, delete it from the cache. */
-							if(lineTask.content.match(String(`\\+\\+\\+${this.plugin.settings.nonExistingTodoistFlag}\\+\\+\\+`)))
+							if(this.plugin.taskParser.hasNonExistingFlag(lineTask.content))
 							{	
 								// remove todoist link & hashtag from task
-								let newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(this.plugin.settings.customSyncTag), "");
+								let newFileContent = this.plugin.fileOperation?.removeSyncTagFromTaskInFile(fileContent, lineTask);
 								if(newFileContent)
 								{
 									fileContent = newFileContent;
 								}
 
-								newFileContent = this.plugin.fileOperation?.findAndReplaceInTask(fileContent, lineTask.id, RegExp(/%%\[tid:: \[[a-zA-Z0-9]+\]\([^\)]*\)\]%%/), "");
+								newFileContent = this.plugin.fileOperation?.removeTodoistLinkFromTaskInFile(fileContent, lineTask);
 								
 								if(newFileContent) {
 									await this.plugin.fileOperation?.writeFileContentToFile(filepath, newFileContent);
@@ -826,9 +827,7 @@ export class TodoistSync {
 									 * Create a todoist event to synchronize a changed description 
 									 * with the hint that the task was not found in todoist.
 									 **/
-									lineTask.content = lineTask.content + " <mark style=\"background: #FF5582A6;\">+++" + this.plugin.settings.nonExistingTodoistFlag + "+++</mark>";
-									lineTask.content = lineTask.content.replace(/[ ]+/, " ");
-									lineTask.content = lineTask.content.replace(/\s^/, "");
+									this.addTodoistTaskNotFoundFlag(lineTask);
 
 									lineTask.labels = lineTask.labels?.filter(label => label !== this.plugin.settings.customSyncTag);
 									updatedTaskStatus.task = lineTask;
@@ -950,6 +949,13 @@ export class TodoistSync {
 				console.error("Error updating task:", error);
 			}
 		}
+	}
+
+	addTodoistTaskNotFoundFlag(lineTask: Task) {
+		lineTask.content = lineTask.content + " <mark style=\"background: #FF5582A6;\">+++" + this.plugin.settings.nonExistingTodoistFlag + "+++</mark>";
+		lineTask.content = lineTask.content.replace(/[ ]+/, " ");
+		lineTask.content = lineTask.content.replace(/\s^/, "");
+		return lineTask;
 	}
 
 	async fullTextModifiedTaskCheck(file_path: string): Promise<void> {
