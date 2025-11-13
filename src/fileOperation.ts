@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { TFile, Notice } from "obsidian";
 import type AnotherSimpleTodoistSync from "../main";
+import type { Task } from "./cacheOperation";
 
 export class FileOperation {
 	app: App;
@@ -608,5 +609,13 @@ export class FileOperation {
 				await this.app.vault.modify(file, filecontent);
 			}
 		}
+	}
+
+	removeTodoistLinkFromTaskInFile(fileContent: string, lineTask: Task) {
+		return this.findAndReplaceInTask(fileContent, lineTask.id, RegExp(/%%\[tid:: \[[a-zA-Z0-9]+\]\([^\)]*\)\]%%/), "");
+	}
+
+	removeSyncTagFromTaskInFile(fileContent: string, lineTask: Task) {
+		return this.findAndReplaceInTask(fileContent, lineTask.id, RegExp(this.plugin.settings.customSyncTag), "");
 	}
 }
