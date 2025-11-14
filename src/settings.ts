@@ -115,6 +115,10 @@ export interface AnotherSimpleTodoistSyncSettings {
 	syncNonExistingTaskFromTodist: boolean;
 	nonExistingTodoistFlag: string;
 	autofixNonExistingTodoistTask: boolean;
+	missingTaskStyleSource: string;
+	missingTaskHighlightColor: string;
+	missingTaskHighlightClass: string;
+	missingTaskHighlightStyle: string;
 }
 
 export const DefaultAppSettings: Partial<AnotherSimpleTodoistSyncSettings> = {
@@ -147,6 +151,10 @@ export const DefaultAppSettings: Partial<AnotherSimpleTodoistSyncSettings> = {
 	syncNonExistingTaskFromTodist: false,
 	nonExistingTodoistFlag: "Task not found in todoist",
 	autofixNonExistingTodoistTask: false,
+	missingTaskStyleSource: "color",
+	missingTaskHighlightColor: "#ff0000",
+	missingTaskHighlightClass: "",
+	missingTaskHighlightStyle: `style="background-color: #ff0000"`,
 };
 
 export class AnotherSimpleTodoistSyncPluginSettingTab extends PluginSettingTab {
@@ -155,6 +163,19 @@ export class AnotherSimpleTodoistSyncPluginSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: AnotherSimpleTodoistSync) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	updateHighlightStyle(){
+		switch (this.plugin.settings.missingTaskStyleSource) {
+			case "css-class":
+				this.plugin.settings.missingTaskHighlightStyle = `class="${this.plugin.settings.missingTaskHighlightClass}"`;
+				break;
+		
+			case "color:":
+			default:
+				this.plugin.settings.missingTaskHighlightStyle = `style="background-color: ${this.plugin.settings.missingTaskHighlightColor}"`;
+				break;
+		}
 	}
 
 	async display(): Promise<void> {
@@ -613,7 +634,7 @@ export class AnotherSimpleTodoistSyncPluginSettingTab extends PluginSettingTab {
 				);
 		}
 
-				// Handle tasks that have a todoist id in obsidian but are not found in todoist
+		// Handle tasks that have a todoist id in obsidian but are not found in todoist
 		if (this.plugin.settings.experimentalFeatures) {
 			containerEl.createEl('h3', {text: 'Sync Options for Tasks not Found in Todoist'});
 			let divEl = containerEl.createEl('div', {cls: 'settings-ots-indent-container'});
@@ -658,6 +679,70 @@ export class AnotherSimpleTodoistSyncPluginSettingTab extends PluginSettingTab {
 						})
 				);
 
+			new Setting(divEl)
+				.setName("Source highlight style")
+				.setDesc(
+					"Choose if the style for the marking string for missing todoist is defined by a color or a custom css class.",
+				)
+				.addDropdown((component) =>
+					component
+						.addOption(
+							"color",
+							"Select Color",
+						)
+						.addOption(
+							"css-class",
+							"Set CSS Class",
+						)
+						.setValue(this.plugin.settings.missingTaskStyleSource)
+						.onChange((value) => {
+							this.plugin.settings.missingTaskStyleSource = value;
+							this.updateHighlightStyle();
+							this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+				
+			switch (this.plugin.settings.missingTaskStyleSource) {
+				case "css-class":
+					new Setting(divEl)
+						.setName("Custom CSS class")
+						.setDesc("Set a custom CSS class for highlighting missing classes.")
+						.addText((text) =>
+							text
+							.setPlaceholder("custom class")
+							.setValue(this.plugin.settings.missingTaskHighlightClass)
+							.onChange(async (value) => {
+								if(value)
+								{
+									//make sure that it's "class name" only, no dot.
+									this.plugin.settings.missingTaskHighlightClass = value.replace(/^[\.]/, "");
+									this.updateHighlightStyle();
+									this.plugin.saveSettings();
+								}else{
+									new Notice("Field must not be empty!");
+								}
+							})
+						);
+					break;
+				
+				case "color":
+				default:
+					new Setting(divEl)
+						.setName("Choose color")
+						.setDesc("Choose color for highlighting missing tasks.")
+						.addColorPicker((color) => 
+							color
+							.setValue(this.plugin.settings.missingTaskHighlightColor)
+							.onChange(async (value) => {
+								this.plugin.settings.missingTaskHighlightColor = value
+								this.updateHighlightStyle();
+								this.plugin.saveSettings();
+							})
+						);
+					break;
+			}
+			
 			new Setting(divEl)
 				.setName("Automatically resync non existing todoist tasks")
 				.setDesc(
