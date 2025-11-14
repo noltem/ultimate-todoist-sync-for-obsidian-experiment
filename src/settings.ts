@@ -317,64 +317,6 @@ export class AnotherSimpleTodoistSyncPluginSettingTab extends PluginSettingTab {
 				);
 		}
 
-		// Handle tasks that have a todoist id in obsidian but are not found in todoist
-		if (this.plugin.settings.experimentalFeatures) {
-			new Setting(containerEl)
-				.setName("Handle non-existing tasks in todoist")
-				.setDesc(
-					"This will flag tasks that exist in obsidian with todoist tag & link which do not exist in todoist anymore.",
-				)
-				.addToggle((component) =>
-					component
-						.setValue(this.plugin.settings.syncNonExistingTaskFromTodist)
-						.onChange((value) => {
-							this.plugin.settings.syncNonExistingTaskFromTodist = value;
-							this.plugin.saveSettings();
-						}),
-				);
-
-			new Setting(containerEl)
-				.setName("String added to nonexisting todoist tasks")
-				.setDesc(
-					"Set a custom string that indicates that a task is not existing in todoist",
-				)
-				.addText((text) =>
-					text
-						.setPlaceholder("Task not found in todoist")
-						.setValue(this.plugin.settings.nonExistingTodoistFlag)
-						.onChange(async (value) => {
-							if(value)
-							{
-								if(value.match(/[.*+?^${}()|[\]\\]/g))
-								{
-									new Notice("String must not contain RegEx special characters.");
-								}else{
-
-								}
-								this.plugin.settings.nonExistingTodoistFlag = value;
-								this.plugin.saveSettings();
-							}else{
-								new Notice("Field must not be empty!");
-							}
-						})
-				);
-				
-			new Setting(containerEl)
-				.setName("Automatically resync non existing todoist tasks")
-				.setDesc(
-					"This will automatically remove the marking text for tasks that have not been found and readd the todoist sync tag.",
-				)
-				.addToggle((component) =>
-					component
-						.setValue(this.plugin.settings.autofixNonExistingTodoistTask)
-						.onChange((value) => {
-							this.plugin.settings.autofixNonExistingTodoistTask = value;
-							this.plugin.saveSettings();
-						}),
-				);
-			
-		}
-
 		// Prevent plugin from any sync to prevent issues while Obsidian is indexing files
 		if (this.plugin.settings.experimentalFeatures) {
 			new Setting(containerEl)
@@ -669,6 +611,67 @@ export class AnotherSimpleTodoistSyncPluginSettingTab extends PluginSettingTab {
 							new Notice("Full vault sync is enabled.");
 						}),
 				);
+		}
+
+				// Handle tasks that have a todoist id in obsidian but are not found in todoist
+		if (this.plugin.settings.experimentalFeatures) {
+			containerEl.createEl('h3', {text: 'Sync Options for Tasks not Found in Todoist'});
+			let divEl = containerEl.createEl('div', {cls: 'settings-ots-indent-container'});
+
+			new Setting(divEl)
+				.setName("Handle non-existing tasks in todoist")
+				.setDesc(
+					"This will flag tasks that exist in obsidian with todoist tag & link which do not exist in todoist anymore.",
+				)
+				.addToggle((component) =>
+					component
+						.setValue(this.plugin.settings.syncNonExistingTaskFromTodist)
+						.onChange((value) => {
+							this.plugin.settings.syncNonExistingTaskFromTodist = value;
+							this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(divEl)
+				.setName("String added to non-existing todoist tasks")
+				.setDesc(
+					"Set a custom string that indicates that a task is not existing in todoist",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("Task not found in todoist")
+						.setValue(this.plugin.settings.nonExistingTodoistFlag)
+						.onChange(async (value) => {
+							if(value)
+							{
+								if(value.match(/[.*+?^${}()|[\]\\]/g))
+								{
+									new Notice("String must not contain RegEx special characters.");
+								}else{
+
+								}
+								this.plugin.settings.nonExistingTodoistFlag = value;
+								this.plugin.saveSettings();
+							}else{
+								new Notice("Field must not be empty!");
+							}
+						})
+				);
+
+			new Setting(divEl)
+				.setName("Automatically resync non existing todoist tasks")
+				.setDesc(
+					"This will automatically remove the marking text for tasks that have not been found and readd the todoist sync tag.",
+				)
+				.addToggle((component) =>
+					component
+						.setValue(this.plugin.settings.autofixNonExistingTodoistTask)
+						.onChange((value) => {
+							this.plugin.settings.autofixNonExistingTodoistTask = value;
+							this.plugin.saveSettings();
+						}),
+				);
+			
 		}
 
 		new Setting(containerEl)
