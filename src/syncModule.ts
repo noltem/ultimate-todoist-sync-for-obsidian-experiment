@@ -952,7 +952,7 @@ export class TodoistSync {
 	}
 
 	addTodoistTaskNotFoundFlag(lineTask: Task) {
-		lineTask.content = lineTask.content + " <mark style=\"background: #FF5582A6;\">+++" + this.plugin.settings.nonExistingTodoistFlag + "+++</mark>";
+		lineTask.content = lineTask.content + " <mark " + this.plugin.settings.missingTaskHighlightStyle + ">+++" + this.plugin.settings.nonExistingTodoistFlag + "+++</mark>";
 		lineTask.content = lineTask.content.replace(/[ ]+/, " ");
 		lineTask.content = lineTask.content.replace(/\s^/, "");
 		return lineTask;
