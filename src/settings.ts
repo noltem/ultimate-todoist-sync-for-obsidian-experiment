@@ -168,12 +168,12 @@ export class AnotherSimpleTodoistSyncPluginSettingTab extends PluginSettingTab {
 	updateHighlightStyle(){
 		switch (this.plugin.settings.missingTaskStyleSource) {
 			case "css-class":
-				this.plugin.settings.missingTaskHighlightStyle = `class="${this.plugin.settings.missingTaskHighlightClass}"`;
+				this.plugin.settings.missingTaskHighlightStyle = `class="${this.plugin.settings.missingTaskHighlightClass} ots-marker"`;
 				break;
 		
 			case "color:":
 			default:
-				this.plugin.settings.missingTaskHighlightStyle = `style="background-color: ${this.plugin.settings.missingTaskHighlightColor}"`;
+				this.plugin.settings.missingTaskHighlightStyle = `class="ots-marker" style="background-color: ${this.plugin.settings.missingTaskHighlightColor}"`;
 				break;
 		}
 	}

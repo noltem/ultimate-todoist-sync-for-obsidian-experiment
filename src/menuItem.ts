@@ -1,7 +1,11 @@
-import {MarkdownView, Menu, MenuItem, Notice} from 'obsidian';
+import {Editor, MarkdownView, Menu, MenuItem, Notice} from 'obsidian';
 import type AnotherSimpleTodoistSync from "../main";
-import { Task, CacheOperation } from './cacheOperation';
+import { Task } from './cacheOperation';
 import {} from './syncModule';
+import {dedupe, around} from "monkey-around"
+import type { FileOperation } from './fileOperation';
+import type { TodoistSync } from './syncModule';
+import { EditorView } from '@codemirror/view';
 
 
 export class MenuItemCreator {
@@ -14,7 +18,7 @@ export class MenuItemCreator {
         this.plugin = plugin;
     }
 
-    async addMenuItems(): Promise<void> {
+    async addStaticMenuItems(): Promise<void> {
         this.addParseLinkMenuItem();
     }
 
@@ -28,6 +32,77 @@ export class MenuItemCreator {
         );
     }
 
+    addDynamicOptionsToContextMenu(target:HTMLElement) {
+        let menu = this.menu;
+
+        if (target.closest(".ots-marker")) {
+            menu = new Menu();
+            menu.addItem((item: MenuItem) => item
+                .setTitle("Resync Task to Todoist")
+                .setIcon('lucide-refresh-cw')
+                .setSection("")
+                .onClick(() => this.removeMissingTaskFlag(target, true))
+            );
+            menu.addItem((item: MenuItem) => item
+                .setTitle("Remove \"Not Found\" Tag")
+                .setIcon('lucide-delete')
+                .setSection("")
+                .onClick(() => this.removeMissingTaskFlag(target, false))
+            );
+        }
+
+        return menu;
+    }
+
+    async removeMissingTaskFlag(target: HTMLElement, enableResync:boolean)
+    {
+        
+        const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+        if(view) {
+            const cursor = view.editor.getCursor();
+            const lineNumber = cursor.line;
+            const filepath = view.app.workspace.activeEditor?.file?.path;
+  
+            /** 
+             * Some minor magic: Use the CodeMirror bare-bone Markdown View to navigate the document and replace
+             * the missing task flag.
+             * 
+             * Attention, Obsidian's lines are zero-based?!
+             */
+
+            //@ts-expect-error, not typed
+            const cmEditorView = view.editor.cm as EditorView;
+            const documentPos = cmEditorView.posAtDOM(target);
+            const lineOfTask = cmEditorView.state.doc.lineAt(documentPos);
+
+            if(filepath){
+                /**
+                 * If we want to resync directly after we found a missing task, we must handle the deletion of the task here.
+                 * This is *probably* something that should only happen during testing, but it avoids unintuitive behavior.
+                 */
+                let bModified = false;          
+                let result = this.plugin.fileOperation?.removeMissingTaskFlagFromLine(lineOfTask.text,bModified);
+                if(result) {
+                    // only do this if we have a task with a todoistID.
+                    let todoistId = this.plugin.taskParser?.getTodoistIdFromLineText(result.line);
+                    if(todoistId) {
+                        this.plugin.cacheOperation?.deleteTaskFromCache(todoistId);
+                    }
+                    result.line = result.line.replace(RegExp(/%%\[tid:: \[[a-zA-Z0-9]+\]\([^\)]*\)\]%%/), "")
+                                        .replace(RegExp(this.plugin.settings.customSyncTag), "");
+
+                    if(result.modified) {
+
+                        if(enableResync) {
+                            result.line = result.line + this.plugin.settings.customSyncTag;
+                        }
+                        view.editor.replaceRange(result.line, {line:lineOfTask.number-1, ch:0}, {line:lineOfTask.number-1, ch:lineOfTask.length});
+                    }
+                }
+            }
+        }
+        
+    }
     async parseTodoistLinkToObsidianTask() {
         let link_original = (await navigator.clipboard.readText()).toString();
         // Remove everything before the last dash, so we get -taskid, then remove last dash.

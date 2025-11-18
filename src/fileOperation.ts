@@ -145,12 +145,12 @@ export class FileOperation {
 	removeMissingTaskFlagFromLine(line: string, modified: boolean) {
 		const missingTaskMark = RegExp(`\\<mark.*\\+\\+\\+${this.plugin.settings.nonExistingTodoistFlag}\\+\\+\\+\\<\\/mark\\>`);
 		if (line.match(missingTaskMark)) {
-			line = line.replace(missingTaskMark, "");
-			line = line.replace(RegExp(/[\s]+/, "g"), " ");
-			line = line.replace(RegExp(/\s^/), "");
+			line = line.replace(missingTaskMark, "")
+				.replace(/[\s]+/g, " ")
+				.replace(/\s$/g, "");
 			modified = true;
 		}
-		return { line, modified };
+		return {line, modified};
 	}
 
 	//add Todoist at the line
