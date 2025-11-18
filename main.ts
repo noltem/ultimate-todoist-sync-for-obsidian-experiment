@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, type Editor } from "obsidian";
+import { MarkdownView, Menu, Notice, Plugin, type Editor } from "obsidian";
 
 //settings
 import {
@@ -12,6 +12,8 @@ import { CacheOperation } from "./src/cacheOperation";
 import { FileOperation } from "./src/fileOperation";
 import { TodoistSync } from "./src/syncModule";
 import { SetDefaultProjectInTheFilepathModal } from "src/modal";
+import { MenuItemCreator } from "src/menuItem";
+import { patchMenu } from "src/patchMenu";
 
 export default class AnotherSimpleTodoistSync extends Plugin {
 	settings: AnotherSimpleTodoistSyncSettings;
@@ -23,6 +25,8 @@ export default class AnotherSimpleTodoistSync extends Plugin {
 	lastLines: Map<string, number>;
 	statusBar: HTMLElement;
 	syncLock: boolean;
+	contextMenuModifier: MenuItemCreator | undefined;
+	uninstallMenuPatch:any;
 
 	
 
@@ -36,6 +40,9 @@ export default class AnotherSimpleTodoistSync extends Plugin {
 				);
 				return;
 			}
+
+			patchMenu(this);
+			
 			// This adds a settings tab so the user can configure various aspects of the plugin
 			this.addSettingTab(new AnotherSimpleTodoistSyncPluginSettingTab(this.app, this));
 		if (!this.settings.todoistAPIToken) {
@@ -347,6 +354,7 @@ export default class AnotherSimpleTodoistSync extends Plugin {
 
 	async onunload() {
 		await this.saveSettings();
+		this.uninstallMenuPatch();
 	}
 
 	async loadSettings() {
@@ -440,12 +448,27 @@ export default class AnotherSimpleTodoistSync extends Plugin {
 
 		this.initializeModuleClass();
 
+		this.addStaticOptionsToContextMenu();
+
 		//get user plan resources
 		//const rsp = await this.todoistSyncAPI.getUserResource()
 		this.settings.apiInitialized = true;
 		this.syncLock = false;
 		new Notice("Another Simple Todoist Sync loaded successfully.");
 		return true;
+	}
+
+	async addStaticOptionsToContextMenu() {
+		this.registerEvent(
+			this.app.workspace.on('editor-menu', (menu, _, view) => {
+				const file = view.file;
+				if (!file) {
+					return;
+				}
+				const contextMenuModifier = new MenuItemCreator(menu, this);
+				contextMenuModifier.addStaticMenuItems();
+			})
+		);
 	}
 
 	async initializeModuleClass() {
